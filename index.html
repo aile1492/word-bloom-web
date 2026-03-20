@@ -1,31 +1,49 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 	<head>
 		<meta charset="utf-8">
-		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
+		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0">
 		<title>Word Bloom</title>
 		<style>
-html, body, #canvas {
+* {
 	margin: 0;
 	padding: 0;
-	border: 0;
+	box-sizing: border-box;
 }
 
-body {
-	color: white;
-	background-color: black;
+html, body {
+	width: 100%;
+	height: 100%;
+	background-color: #1a1a2e;
 	overflow: hidden;
 	touch-action: none;
+	font-family: 'Segoe UI', 'Noto Sans', Arial, sans-serif;
+}
+
+/* Container centers the game in portrait aspect ratio */
+#game-container {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	aspect-ratio: 9 / 16;
+	background-color: #000;
+	box-shadow: 0 0 40px rgba(0,0,0,0.8);
+	border-radius: 12px;
+	overflow: hidden;
 }
 
 #canvas {
 	display: block;
+	width: 100%;
+	height: 100%;
 }
 
 #canvas:focus {
 	outline: none;
 }
 
+/* Status overlay */
 #status, #status-splash, #status-progress {
 	position: absolute;
 	left: 0;
@@ -38,12 +56,14 @@ body {
 }
 
 #status {
-	background-color: #242424;
+	background-color: #1a1a2e;
 	display: flex;
 	flex-direction: column;
 	justify-content: center;
 	align-items: center;
 	visibility: hidden;
+	z-index: 10;
+	border-radius: 12px;
 }
 
 #status-splash {
@@ -72,8 +92,22 @@ body {
 
 #status-progress {
 	bottom: 10%;
-	width: 50%;
+	width: 60%;
 	margin: 0 auto;
+	height: 8px;
+	border-radius: 4px;
+	appearance: none;
+	-webkit-appearance: none;
+}
+
+#status-progress::-webkit-progress-bar {
+	background-color: rgba(255,255,255,0.1);
+	border-radius: 4px;
+}
+
+#status-progress::-webkit-progress-value {
+	background: linear-gradient(90deg, #667eea, #764ba2);
+	border-radius: 4px;
 }
 
 #status-notice {
@@ -81,7 +115,6 @@ body {
 	border-radius: 0.5rem;
 	border: 1px solid #9b3943;
 	color: #e0e0e0;
-	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
 	line-height: 1.3;
 	margin: 0 2rem;
 	overflow: hidden;
@@ -89,29 +122,96 @@ body {
 	text-align: center;
 	z-index: 1;
 }
+
+/* Loading text */
+#loading-text {
+	position: absolute;
+	bottom: 15%;
+	left: 50%;
+	transform: translateX(-50%);
+	color: rgba(255,255,255,0.6);
+	font-size: 14px;
+	z-index: 11;
+}
+
+/* Responsive sizing */
+/* Mobile portrait: fill screen */
+@media (max-aspect-ratio: 10/16) {
+	#game-container {
+		width: 100vw;
+		height: 100vh;
+		aspect-ratio: auto;
+		border-radius: 0;
+		box-shadow: none;
+	}
+}
+
+/* Mobile landscape or narrow landscape */
+@media (min-aspect-ratio: 10/16) and (max-height: 900px) {
+	#game-container {
+		height: 100vh;
+		width: auto;
+		border-radius: 0;
+	}
+}
+
+/* Desktop: limit height, show phone frame */
+@media (min-aspect-ratio: 10/16) and (min-height: 901px) {
+	#game-container {
+		height: 92vh;
+		width: auto;
+	}
+}
+
+/* Decorative background text for desktop */
+#bg-info {
+	position: fixed;
+	bottom: 20px;
+	left: 50%;
+	transform: translateX(-50%);
+	color: rgba(255,255,255,0.15);
+	font-size: 12px;
+	text-align: center;
+	pointer-events: none;
+	z-index: 0;
+}
 		</style>
 		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
-<link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
-<link rel="manifest" href="index.manifest.json">
-
+		<link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
+		<link rel="manifest" href="index.manifest.json">
 	</head>
 	<body>
-		<canvas id="canvas">
-			Your browser does not support the canvas tag.
-		</canvas>
+		<div id="game-container">
+			<canvas id="canvas">
+				Your browser does not support the canvas tag.
+			</canvas>
 
-		<noscript>
-			Your browser does not support JavaScript.
-		</noscript>
+			<noscript>
+				Your browser does not support JavaScript.
+			</noscript>
 
-		<div id="status">
-			<img id="status-splash" class="show-image--true fullsize--true use-filter--true" src="index.png" alt="">
-			<progress id="status-progress"></progress>
-			<div id="status-notice"></div>
+			<div id="status">
+				<img id="status-splash" class="show-image--true fullsize--true use-filter--true" src="index.png" alt="">
+				<progress id="status-progress"></progress>
+				<div id="status-notice"></div>
+				<div id="loading-text">Loading Word Bloom...</div>
+			</div>
 		</div>
+
+		<div id="bg-info">Word Bloom — Internal Demo Build</div>
 
 		<script src="index.js"></script>
 		<script>
+// Force canvas to match container size in portrait ratio
+function resizeCanvas() {
+	const container = document.getElementById('game-container');
+	const canvas = document.getElementById('canvas');
+	const w = container.clientWidth;
+	const h = container.clientHeight;
+	canvas.width = w;
+	canvas.height = h;
+}
+
 const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":true,"fileSizes":{"index.pck":39921752,"index.wasm":37685705},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"serviceWorker":"index.service.worker.js"};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
@@ -120,6 +220,7 @@ const engine = new Engine(GODOT_CONFIG);
 	const statusOverlay = document.getElementById('status');
 	const statusProgress = document.getElementById('status-progress');
 	const statusNotice = document.getElementById('status-notice');
+	const loadingText = document.getElementById('loading-text');
 
 	let initializing = true;
 	let statusMode = '';
@@ -130,6 +231,7 @@ const engine = new Engine(GODOT_CONFIG);
 		}
 		if (mode === 'hidden') {
 			statusOverlay.remove();
+			if (loadingText) loadingText.remove();
 			initializing = false;
 			return;
 		}
@@ -152,6 +254,7 @@ const engine = new Engine(GODOT_CONFIG);
 
 	function displayFailureNotice(err) {
 		console.error(err);
+		if (loadingText) loadingText.remove();
 		if (err instanceof Error) {
 			setStatusNotice(err.message);
 		} else if (typeof err === 'string') {
@@ -175,7 +278,6 @@ const engine = new Engine(GODOT_CONFIG);
 			} catch (err) {
 				serviceWorkerRegistrationPromise = Promise.reject(new Error('Service worker registration failed.'));
 			}
-			// There's a chance that installing the service worker would fix the issue
 			Promise.race([
 				serviceWorkerRegistrationPromise.then((registration) => {
 					if (registration != null) {
@@ -183,18 +285,15 @@ const engine = new Engine(GODOT_CONFIG);
 					}
 					return registration;
 				}).then(() => engine.installServiceWorker()),
-				// For some reason, `getRegistration()` can stall
 				new Promise((resolve) => {
 					setTimeout(() => resolve(), 2000);
 				}),
 			]).then(() => {
-				// Reload if there was no error.
 				window.location.reload();
 			}).catch((err) => {
 				console.error('Error while registering service worker:', err);
 			});
 		} else {
-			// Display the message as usual
 			const missingMsg = 'Error\nThe following features required to run Godot projects on the Web are missing:\n';
 			displayFailureNotice(missingMsg + missing.join('\n'));
 		}
@@ -205,6 +304,8 @@ const engine = new Engine(GODOT_CONFIG);
 				if (current > 0 && total > 0) {
 					statusProgress.value = current;
 					statusProgress.max = total;
+					const pct = Math.round((current / total) * 100);
+					if (loadingText) loadingText.textContent = `Loading Word Bloom... ${pct}%`;
 				} else {
 					statusProgress.removeAttribute('value');
 					statusProgress.removeAttribute('max');
@@ -214,8 +315,10 @@ const engine = new Engine(GODOT_CONFIG);
 			setStatusMode('hidden');
 		}, displayFailureNotice);
 	}
+
+	window.addEventListener('resize', resizeCanvas);
+	resizeCanvas();
 }());
 		</script>
 	</body>
 </html>
-
