@@ -19,14 +19,17 @@ html, body {
 	position: absolute;
 	top: 50%; left: 50%;
 	transform: translate(-50%, -50%);
-	aspect-ratio: 9 / 16;
-	background-color: #000;
+	overflow: hidden;
 	box-shadow: 0 0 40px rgba(0,0,0,0.8);
 	border-radius: 12px;
-	overflow: hidden;
 }
 
-#canvas { display: block; width: 100%; height: 100%; }
+#canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+	image-rendering: auto;
+}
 #canvas:focus { outline: none; }
 
 #status, #status-splash, #status-progress { position: absolute; left: 0; right: 0; }
@@ -41,7 +44,6 @@ html, body {
 #status-splash { max-height: 100%; max-width: 100%; margin: auto; }
 #status-splash.show-image--false { display: none; }
 #status-splash.fullsize--true { height: 100%; width: 100%; object-fit: contain; }
-#status-splash.use-filter--false { image-rendering: pixelated; }
 #status-progress, #status-notice { display: none; }
 
 #status-progress {
@@ -61,22 +63,9 @@ html, body {
 	color: rgba(255,255,255,0.6); font-size: 14px; z-index: 11; white-space: nowrap;
 }
 
-/* Mobile portrait: fill screen */
-@media (max-aspect-ratio: 10/16) {
-	#game-container { width: 100vw; height: 100vh; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
-}
-/* Mobile landscape */
-@media (min-aspect-ratio: 10/16) and (max-height: 900px) {
-	#game-container { height: 100vh; width: auto; border-radius: 0; }
-}
-/* Desktop */
-@media (min-aspect-ratio: 10/16) and (min-height: 901px) {
-	#game-container { height: 92vh; width: auto; }
-}
-
 #bg-info {
-	position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-	color: rgba(255,255,255,0.15); font-size: 12px; text-align: center; pointer-events: none; z-index: 0;
+	position: fixed; bottom: 8px; left: 50%; transform: translateX(-50%);
+	color: rgba(255,255,255,0.15); font-size: 11px; text-align: center; pointer-events: none; z-index: 0;
 }
 		</style>
 		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
@@ -84,7 +73,7 @@ html, body {
 	</head>
 	<body>
 		<div id="game-container">
-			<canvas id="canvas">Your browser does not support the canvas tag.</canvas>
+			<canvas id="canvas" width="1080" height="1920">Your browser does not support the canvas tag.</canvas>
 			<noscript>Your browser does not support JavaScript.</noscript>
 			<div id="status">
 				<img id="status-splash" class="show-image--true fullsize--true use-filter--true" src="index.png" alt="">
@@ -95,19 +84,55 @@ html, body {
 		</div>
 		<div id="bg-info">Word Bloom — Internal Demo Build</div>
 
+		<script>
+// Resize game container to fit screen while maintaining 9:16
+function resizeGame() {
+	var container = document.getElementById('game-container');
+	var W = window.innerWidth;
+	var H = window.innerHeight;
+	var targetRatio = 9 / 16;
+	var screenRatio = W / H;
+	var w, h;
+
+	if (screenRatio < targetRatio) {
+		// Screen is narrower than 9:16 -> fit width
+		w = W;
+		h = W / targetRatio;
+	} else {
+		// Screen is wider -> fit height
+		h = H * 0.96;
+		w = h * targetRatio;
+	}
+
+	container.style.width = Math.round(w) + 'px';
+	container.style.height = Math.round(h) + 'px';
+
+	// On mobile portrait, remove decorative styling
+	if (screenRatio < targetRatio) {
+		container.style.borderRadius = '0';
+		container.style.boxShadow = 'none';
+	} else {
+		container.style.borderRadius = '12px';
+		container.style.boxShadow = '0 0 40px rgba(0,0,0,0.8)';
+	}
+}
+window.addEventListener('resize', resizeGame);
+resizeGame();
+		</script>
+
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":true,"fileSizes":{"index.pck":28130088,"index.wasm":37685705},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"serviceWorker":"index.service.worker.js"};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":true,"fileSizes":{"index.pck":28130088,"index.wasm":37685705},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"serviceWorker":"index.service.worker.js"};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
 (function () {
-	const statusOverlay = document.getElementById('status');
-	const statusProgress = document.getElementById('status-progress');
-	const statusNotice = document.getElementById('status-notice');
-	const loadingText = document.getElementById('loading-text');
-	let initializing = true;
-	let statusMode = '';
+	var statusOverlay = document.getElementById('status');
+	var statusProgress = document.getElementById('status-progress');
+	var statusNotice = document.getElementById('status-notice');
+	var loadingText = document.getElementById('loading-text');
+	var initializing = true;
+	var statusMode = '';
 
 	function setStatusMode(mode) {
 		if (statusMode === mode || !initializing) return;
@@ -123,39 +148,36 @@ const engine = new Engine(GODOT_CONFIG);
 		statusMode = mode;
 	}
 
-	function setStatusNotice(text) {
-		while (statusNotice.lastChild) statusNotice.removeChild(statusNotice.lastChild);
-		text.split('\n').forEach((line) => {
-			statusNotice.appendChild(document.createTextNode(line));
-			statusNotice.appendChild(document.createElement('br'));
-		});
-	}
-
 	function displayFailureNotice(err) {
 		console.error(err);
 		if (loadingText) loadingText.remove();
-		if (err instanceof Error) setStatusNotice(err.message);
-		else if (typeof err === 'string') setStatusNotice(err);
-		else setStatusNotice('An unknown error occurred.');
+		var msg = 'An unknown error occurred.';
+		if (err instanceof Error) msg = err.message;
+		else if (typeof err === 'string') msg = err;
+		while (statusNotice.lastChild) statusNotice.removeChild(statusNotice.lastChild);
+		msg.split('\n').forEach(function(line) {
+			statusNotice.appendChild(document.createTextNode(line));
+			statusNotice.appendChild(document.createElement('br'));
+		});
 		setStatusMode('notice');
 		initializing = false;
 	}
 
-	const missing = Engine.getMissingFeatures({ threads: GODOT_THREADS_ENABLED });
+	var missing = Engine.getMissingFeatures({ threads: GODOT_THREADS_ENABLED });
 
 	if (missing.length !== 0) {
 		if (GODOT_CONFIG['serviceWorker'] && GODOT_CONFIG['ensureCrossOriginIsolationHeaders'] && 'serviceWorker' in navigator) {
-			let swp;
+			var swp;
 			try { swp = navigator.serviceWorker.getRegistration(); }
 			catch (err) { swp = Promise.reject(new Error('Service worker registration failed.')); }
 			Promise.race([
-				swp.then((reg) => {
+				swp.then(function(reg) {
 					if (reg != null) return Promise.reject(new Error('Service worker already exists.'));
 					return reg;
-				}).then(() => engine.installServiceWorker()),
-				new Promise((resolve) => setTimeout(() => resolve(), 2000)),
-			]).then(() => window.location.reload())
-			.catch((err) => console.error('Error while registering service worker:', err));
+				}).then(function() { return engine.installServiceWorker(); }),
+				new Promise(function(resolve) { setTimeout(resolve, 2000); }),
+			]).then(function() { window.location.reload(); })
+			.catch(function(err) { console.error('Error while registering service worker:', err); });
 		} else {
 			displayFailureNotice('Error\nThe following features required to run Godot projects on the Web are missing:\n' + missing.join('\n'));
 		}
@@ -173,7 +195,7 @@ const engine = new Engine(GODOT_CONFIG);
 					statusProgress.removeAttribute('max');
 				}
 			},
-		}).then(() => setStatusMode('hidden'), displayFailureNotice);
+		}).then(function() { setStatusMode('hidden'); }, displayFailureNotice);
 	}
 }());
 		</script>
