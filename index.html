@@ -68,6 +68,20 @@ html, body {
 	color: rgba(255,255,255,0.15); font-size: 11px; text-align: center; pointer-events: none; z-index: 0;
 }
 		</style>
+		<script>
+		// Unregister any old service workers from previous PWA builds
+		if ('serviceWorker' in navigator) {
+			navigator.serviceWorker.getRegistrations().then(function(registrations) {
+				registrations.forEach(function(reg) { reg.unregister(); });
+				if (registrations.length > 0) {
+					caches.keys().then(function(names) {
+						names.forEach(function(name) { caches.delete(name); });
+					});
+					console.log('Old service workers and caches cleared.');
+				}
+			});
+		}
+		</script>
 		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
 		<link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
 	</head>
